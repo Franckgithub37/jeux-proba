@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le Perroquet de garde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Montserrat:wght@400;600;700;800&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<style>
+/* Mise en page : scène 3D plein cadre. Par-dessus : carte de résultat en haut, console en bas à gauche, faces du dé en bas à droite. Les "plans" (infographies) et le carnet prennent tout l'écran entre deux chapitres. */
+:root{
+  --nuit:#01233F; --profond:#0C497B; --moyen:#0B80B2; --vif:#29ABE2; --cyan:#74D2FA; --orange:#FF8000; --pale:#DEF5FF;
+  --verre:rgba(1,29,52,.82); --trait:rgba(116,210,250,.28);
+  --titre:"Poppins","Calibri",sans-serif; --texte:"Montserrat","Calibri",sans-serif; --main:"Caveat","Segoe Script",cursive;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:#020d18;color:#fff;font-family:var(--texte);font-size:14px;line-height:1.45;overflow:hidden}
+button{font-family:inherit;cursor:pointer;color:inherit}
+button:focus-visible,input:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+h1,h2,h3{font-family:var(--titre);text-wrap:balance}
+#game{position:relative;height:100%;overflow:hidden}
+#view{position:absolute;inset:0;overflow:hidden;background:#06131f}
+#layer{position:absolute;inset:0;pointer-events:none;z-index:2}
+#layer>*{pointer-events:auto}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block}
+.vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 52%,rgba(0,8,16,.55) 100%)}
+.bars i{position:absolute;left:0;right:0;height:0;background:#000;transition:height .7s ease;z-index:3}
+.bars i:first-child{top:0}.bars i:last-child{bottom:0}
+.cine .bars i,.innote .bars i{height:9%}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;z-index:7;transition:opacity .18s}
+#fade.on{opacity:1}
+#caption{position:absolute;left:0;right:0;bottom:13%;text-align:center;font-family:var(--titre);font-weight:600;font-size:clamp(15px,2vw,22px);text-shadow:0 2px 12px #000,0 0 3px #000;padding:0 24px;opacity:0;transition:opacity .4s;z-index:10;pointer-events:none;text-wrap:balance}
+#caption.show{opacity:1}
+.inplan #caption{bottom:30px}
+#skip{position:absolute;right:16px;top:14px;z-index:11;background:rgba(0,0,0,.5);border:1px solid var(--trait);border-radius:99px;padding:7px 14px;font-weight:700;font-size:12.5px;display:none}
+.cine #skip,.inplan #skip{display:block}
+.glass{background:var(--verre);border:1px solid var(--trait);border-radius:16px;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+/* HUD haut */
+#left{position:absolute;left:16px;top:14px;width:292px;display:flex;flex-direction:column;gap:10px;z-index:2;transition:opacity .4s}
+#hud{padding:9px 14px}
+#hud .tag{font-size:10.5px;font-weight:800;letter-spacing:.12em;color:var(--cyan)}
+#hud .obj{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;font-family:var(--titre);font-weight:600;font-size:15px;margin-top:2px}
+.pips{display:flex;gap:5px}
+.pips i{width:20px;height:6px;border-radius:4px;background:rgba(116,210,250,.25)}
+.pips i.on{background:var(--orange)}.pips i.done{background:var(--cyan)}
+#tools{position:absolute;right:16px;top:14px;display:flex;gap:8px;z-index:2;transition:opacity .4s}
+#tools button{padding:8px 12px;font-weight:700;font-size:12.5px;border-radius:99px}
+.cine #layer>*,.idle #layer>*,.innote #layer>*,.inplan #layer>*{opacity:0!important;pointer-events:none!important}
+
+/* Console de jeu (agrandie) : température, sources, lancer */
+#console{position:absolute;left:16px;bottom:18px;display:flex;align-items:center;gap:26px;padding:18px 20px 18px 24px;z-index:2;max-width:calc(100% - 32px);transition:opacity .35s,transform .35s}
+#console.hide,#faces.hide{opacity:0;pointer-events:none;transform:translateY(20px)}
+.gauge{position:relative;width:270px}
+.gauge.wide{width:330px}
+.glabel{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan)}
+.glabel b{color:#fff;letter-spacing:0;text-transform:none;font-size:17px}
+#temp{width:100%;appearance:none;-webkit-appearance:none;height:18px;border-radius:99px;margin:12px 0 7px;background:linear-gradient(90deg,#74D2FA,#29ABE2 35%,#FA9C3C 72%,#FF8000);box-shadow:inset 0 1px 3px rgba(0,0,0,.5)}
+#temp::-webkit-slider-thumb{-webkit-appearance:none;width:36px;height:36px;border-radius:50%;background:#fff;border:7px solid var(--nuit);box-shadow:0 0 0 2px #fff,0 3px 8px rgba(0,0,0,.5)}
+#temp::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:#fff;border:7px solid var(--nuit);box-shadow:0 0 0 2px #fff}
+.gends{display:flex;justify-content:space-between;font-size:12px;color:#b9dff3;min-height:17px}
+/* Carte "Sources", à gauche sous le chapitre : une ligne par niveau de sources */
+.srcard{position:relative;padding:11px 12px 12px}
+.srcard .lock{position:static;display:none;margin-top:8px;padding:5px 8px;background:none;border:1px dashed var(--trait);border-radius:9px;font-size:11.5px}
+.srcard.locked .lock{display:flex}
+.srcard.locked .srcs button:not([aria-pressed="true"]){opacity:.42}
+.srcard h3{font-family:var(--texte);font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);margin-bottom:8px}
+.srcs{display:grid;gap:7px}
+.srcs button{position:relative;display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:2px solid var(--trait);background:rgba(2,20,36,.65);border-radius:13px;padding:6px 30px 6px 7px;font-family:var(--titre);font-weight:600;font-size:13.5px;line-height:1.15;transition:transform .15s,background .15s,box-shadow .15s,opacity .2s}
+.srcs .ic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(180deg,var(--s1),var(--sc));box-shadow:inset 0 2px 0 rgba(255,255,255,.45)}
+.srcs .ic .gi{width:84%;height:84%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.srcs .ic .fb{width:14px;height:14px;border-radius:4px;background:rgba(255,255,255,.85)}
+.srcs small{display:block;font-family:var(--texte);font-weight:600;font-size:11px;color:#a9d6ee;margin-top:1px}
+.srcs button:not(:disabled):hover{transform:translateX(3px)}
+.srcs button[aria-pressed="true"]{background:linear-gradient(180deg,var(--s1),var(--sc));color:var(--nuit);border-color:rgba(255,255,255,.85);box-shadow:inset 0 2px 0 rgba(255,255,255,.5),0 0 0 2px var(--sg),0 0 18px var(--sg)}
+.srcs button[aria-pressed="true"] small{color:#0b2440}
+.srcs button[aria-pressed="true"] .ic{background:rgba(255,255,255,.4)}
+.srcs button:disabled{cursor:default}
+.srcs button.done::after{content:"✓";position:absolute;right:7px;top:50%;margin-top:-10px;width:20px;height:20px;border-radius:50%;background:#22c36b;color:#fff;font-family:var(--texte);font-size:12px;font-weight:800;display:grid;place-items:center}
+.srcs button.done:not([aria-pressed="true"]){opacity:.55}
+.lock{display:none;position:absolute;inset:-8px;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:13px;background:rgba(1,24,43,.86);border-radius:12px;color:var(--cyan);border:1px dashed var(--trait)}
+.locked .lock{display:flex}
+.fresh{animation:fresh 1s 4}
+@keyframes fresh{50%{filter:drop-shadow(0 0 10px var(--orange)) brightness(1.25)}}
+#roll{display:flex;align-items:center;gap:12px;border:0;border-radius:18px;padding:18px 24px 18px 18px;background:linear-gradient(180deg,#FA9C3C,#FF8000 55%,#E86008);color:var(--nuit);font-family:var(--titre);font-weight:700;font-size:21px;box-shadow:0 6px 0 #a84a00,0 0 30px rgba(255,128,0,.45);transition:transform .08s,box-shadow .08s,filter .2s;white-space:nowrap}
+#roll svg{width:42px;height:42px}
+#roll kbd{font-family:var(--texte);font-size:11px;font-weight:800;background:rgba(1,35,63,.16);border-radius:6px;padding:3px 6px}
+#roll:hover{filter:brightness(1.08)}
+#roll:active{transform:translateY(5px);box-shadow:0 1px 0 #a84a00}
+#roll:disabled{filter:grayscale(.7) brightness(.75);cursor:default;box-shadow:0 6px 0 #50310f}
+#hint{position:absolute;left:16px;bottom:172px;font-weight:700;font-size:13.5px;background:rgba(0,0,0,.6);padding:7px 14px;border-radius:99px;opacity:0;transition:opacity .4s;pointer-events:none!important;z-index:2}
+#hint.show{opacity:1}
+
+/* Les 20 faces, en bas à droite */
+#faces{position:absolute;right:16px;bottom:18px;width:232px;padding:12px 14px;z-index:2;transition:opacity .35s,transform .35s}
+#faces h3{font-family:var(--texte);font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--cyan);margin-bottom:7px}
+#netd20{width:100%;display:block;margin:0 auto 8px}
+#netd20 polygon{stroke:#01233F;stroke-width:1.4;stroke-linejoin:round;transition:fill .35s}
+#netd20 text{font-family:var(--texte);font-size:10.5px;font-weight:800;fill:#01233F;text-anchor:middle;pointer-events:none}
+#netd20 .hit polygon{stroke:#fff;stroke-width:3;animation:hit .5s 4 alternate}
+@keyframes hit{to{filter:brightness(1.6)}}
+.leg{display:grid;grid-template-columns:12px minmax(0,1fr) auto;gap:7px;align-items:center;font-size:11.5px;font-weight:600;padding:1.5px 0;transition:opacity .3s}
+.leg i{width:12px;height:12px;border-radius:3px}
+.leg b{font-variant-numeric:tabular-nums}
+.leg.off{opacity:.35}
+@media (max-width:1300px){#faces{bottom:auto;top:64px}}
+
+/* Bulle du perroquet et face tirée */
+#bubble{position:absolute;z-index:2;transform:translate(-50%,-100%);background:#fff;color:var(--nuit);font-weight:700;font-size:13.5px;padding:8px 13px;border-radius:14px;max-width:230px;text-align:center;opacity:0;transition:opacity .25s;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)}
+#bubble::after{content:"";position:absolute;left:50%;bottom:-7px;width:14px;height:14px;background:#fff;transform:translateX(-50%) rotate(45deg)}
+#bubble.show{opacity:1}
+#pop{position:absolute;z-index:2;transform:translate(0,-50%) scale(.6);transform-origin:left center;opacity:0;transition:opacity .2s,transform .3s cubic-bezier(.2,1.6,.4,1);pointer-events:none;text-align:center;padding:8px 16px 10px}
+#pop.show{opacity:1;transform:translate(0,-50%) scale(1)}
+#pop small{display:block;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--cyan)}
+#pop b{display:block;font-family:var(--titre);font-size:34px;line-height:1;color:var(--orange)}
+#pop span{display:inline-block;margin-top:5px;background:var(--pale);color:var(--nuit);font-weight:700;border-radius:8px;padding:2px 9px;font-size:14px}
+
+/* Carte de résultat, en haut, au-dessus du portable */
+#card{position:absolute;left:max(24%,330px);top:14px;transform:translateY(-20px);width:min(430px,calc(100% - 24px));z-index:3;background:#F8FCFF;color:var(--nuit);border:3px solid var(--orange);border-radius:16px;padding:11px 16px 13px;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s;box-shadow:0 14px 40px rgba(0,0,0,.45)}
+#card.show{opacity:1;pointer-events:auto;transform:none}
+#card .k{display:block;font-size:10.5px;font-weight:800;letter-spacing:.14em;color:var(--moyen)}
+.res{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin:5px 0 6px}
+.res .face{font-family:var(--titre);font-weight:700;font-size:22px;background:var(--orange);border-radius:10px;padding:1px 12px}
+.res .arr{font-weight:600;color:var(--profond)}
+.res .word{font-family:var(--titre);font-size:20px;line-height:1.2}
+.stamp{font-size:10.5px;font-weight:800;letter-spacing:.1em;border:2px solid var(--orange);color:#c95a00;border-radius:5px;padding:1px 6px;transform:rotate(-3deg)}
+.orig{display:flex;gap:8px;align-items:center;font-size:13.5px;font-weight:600;color:var(--profond)}
+.orig i{flex:none;width:14px;height:14px;border-radius:4px;border:1px solid rgba(1,35,63,.35)}
+.verd{display:inline-block;margin-top:6px;font-size:12.5px;font-weight:800;border-radius:99px;padding:2px 10px;background:#DEF5FF;color:var(--profond)}
+.verd.ko{background:#FFE3C7;color:#a84a00}
+.truth{margin-top:9px;border-top:2px dashed #b9dcec;padding-top:8px;opacity:0;transform:translateY(6px);transition:opacity .5s,transform .5s}
+#card.t2 .truth{opacity:1;transform:none}
+.truth p{font-family:var(--titre);font-weight:600;font-size:17px;line-height:1.3}
+.btn{border:0;border-radius:12px;padding:11px 18px;font-weight:800;font-size:14.5px;background:var(--orange);color:var(--nuit);box-shadow:0 4px 0 #a84a00}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 #a84a00}
+.btn.alt{background:transparent;color:#fff;box-shadow:inset 0 0 0 2px var(--cyan)}
+#card .btn{margin-top:10px;opacity:0;transition:opacity .4s}
+#card.t2 .btn{opacity:1}
+
+/* ---------- Écrans narratifs : habillage calé sur les images de référence (images/ref_*.png) ---------- */
+:root{--halo:rgba(63,208,255,.75);--halo-o:rgba(255,140,20,.8);--papier:#F8F4E8;--encre:#16357a}
+/* Images générées (PNG détourés de images/generated/). Si un fichier manque, l'élément de secours .fb qui le suit s'affiche. */
+.gi{display:block;max-width:100%}
+.gi[data-miss]{display:none}
+.fb{display:none}
+.gi[data-miss]+.fb{display:block}
+#plan{position:absolute;inset:0;z-index:8;display:none;flex-direction:column;align-items:center;justify-content:center;gap:clamp(8px,1.9vh,22px);padding:16px 28px 84px;opacity:0;transition:opacity .45s;overflow:hidden;
+  background:radial-gradient(ellipse at 50% -10%,rgba(41,171,226,.26),transparent 58%),radial-gradient(ellipse at 50% 115%,rgba(41,171,226,.14),transparent 55%),radial-gradient(rgba(116,210,250,.16) 1px,transparent 1.5px) 0 0/22px 22px,linear-gradient(180deg,#0a1628,#0d2847 55%,#0a1b34)}
+#plan::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 55%,rgba(2,8,18,.6) 100%)}
+#plan>*{position:relative;z-index:1}
+#plan.show{display:flex}#plan.in{opacity:1}#plan.in.peek{opacity:0;transition:opacity .2s}
+.eyebrow{font-family:var(--titre);font-size:clamp(12px,1.35vw,22px);font-weight:700;letter-spacing:.3em;color:#3fd0ff;text-shadow:0 0 18px rgba(63,208,255,.55)}
+#plan h2,.endbox h2,#menu h1{font-weight:700;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.28),0 12px 30px rgba(0,0,0,.5)}
+#plan h2{font-size:clamp(30px,5.2vw,88px);line-height:1.02;text-align:center;margin-top:-4px}
+#plan h2 em,.endbox h2 em,#menu h1 em{font-style:normal;color:var(--orange);text-shadow:0 3px 0 rgba(120,50,0,.45),0 0 36px rgba(255,128,0,.5)}
+#plan [data-s]{opacity:0;transform:translateY(12px) scale(.97);transition:opacity .9s,transform .9s cubic-bezier(.2,1.2,.3,1)}
+#plan [data-s].on{opacity:1;transform:none}
+
+/* Rangées "pilule" brillantes : sources (chapitre 1) et niveaux de sources (chapitre 3) */
+.pill{--c1:#8fe3ff;--c2:#2bb4ea;--g:rgba(63,208,255,.7);display:flex;align-items:center;gap:.7em;min-height:2.5em;padding:.3em 1.1em .3em .8em;border-radius:.82em;background:linear-gradient(180deg,var(--c1),var(--c2));border:.09em solid rgba(255,255,255,.8);
+  box-shadow:inset 0 .12em 0 rgba(255,255,255,.6),inset 0 -.22em .4em rgba(0,0,0,.16),0 0 0 .07em var(--g),0 0 1em var(--g),0 .35em .7em rgba(0,0,0,.4);color:#0b2440;font-family:var(--titre);font-weight:700;font-size:clamp(15px,min(2.05vw,3.3vh),34px);line-height:1.1}
+.pill.f1{--c1:#c9f1ff;--c2:#7fd4f6}
+.pill.f2{--c1:#fbf3df;--c2:#e9d9b8;--g:rgba(240,225,190,.5)}
+.pill.f3{--c1:#ffb23e;--c2:#ff8000;--g:var(--halo-o)}
+.pill .ic{flex:none;width:1.75em;height:1.75em;display:grid;place-items:center;padding-right:.65em;border-right:.07em solid rgba(11,36,64,.35);box-sizing:content-box}
+.pill .ic .gi{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 .1em .12em rgba(0,0,0,.35))}
+.pill .ic .fb{width:1.1em;height:1.1em;border-radius:.3em;background:rgba(255,255,255,.75);box-shadow:inset 0 0 0 .12em rgba(11,36,64,.3)}
+.p1{position:relative;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:9%;align-items:center;width:min(1500px,94%)}
+.p1 .links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.lk{fill:none;stroke:#3fd0ff;stroke-width:3.5;stroke-dasharray:9 9;stroke-linecap:round;animation:flux 1.1s linear infinite;filter:drop-shadow(0 0 5px rgba(63,208,255,.8));transition:stroke 1s}
+.lk.f2{stroke:#f3e7c9;filter:none}.lk.f3{stroke:#ff9a1f;filter:drop-shadow(0 0 5px rgba(255,140,20,.8))}
+@keyframes flux{to{stroke-dashoffset:-18}}
+.pills{display:grid;gap:clamp(8px,1.9vh,22px)}
+.mascot{position:relative;height:min(52vh,44vw);justify-self:center;width:100%;display:grid;place-items:center}
+.mascot .gi,.mascot svg.fb{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 28px rgba(63,208,255,.45)) drop-shadow(0 18px 22px rgba(0,0,0,.45))}
+.mascot .tag{position:absolute;left:50%;bottom:-7%;transform:translateX(-50%)!important;white-space:nowrap;font-family:var(--titre);font-weight:600;font-size:clamp(13px,1.5vw,24px);background:rgba(8,22,42,.9);border:2px solid #9fe8ff;box-shadow:0 0 18px var(--halo);border-radius:99px;padding:5px 18px}
+.p1 .pill{transition:opacity .9s,transform .9s cubic-bezier(.2,1.2,.3,1),filter 1.2s}
+.p1.mix .pill{filter:grayscale(1) brightness(.8)}
+.p1.mix .lk{stroke:#9fb3c6;filter:none}
+
+/* Message clé du chapitre : le traitement le plus fort de l'écran, bordure et halo orange */
+.say{text-wrap:balance;font-family:var(--titre);font-weight:700;font-size:clamp(17px,2.5vw,42px);line-height:1.15;text-align:center;color:#fff;background:linear-gradient(180deg,rgba(12,30,56,.96),rgba(8,20,40,.96));border:3px solid #ff9a1f;border-radius:22px;padding:.42em 1.1em;max-width:min(1300px,94%);
+  box-shadow:inset 0 0 0 2px rgba(255,200,120,.3),0 0 26px var(--halo-o),0 10px 26px rgba(0,0,0,.45);text-shadow:0 2px 0 rgba(0,0,0,.35)}
+
+/* Cartes : claire "carnet" et sombre "info" */
+.pcard{background:var(--papier) radial-gradient(rgba(60,120,170,.3) 1px,transparent 1.4px) 0 0/20px 20px;color:#0b2440;border-radius:26px;border:3px solid #dff6ff;box-shadow:0 0 0 3px var(--halo),0 0 30px var(--halo),0 16px 34px rgba(0,0,0,.45);padding:clamp(14px,2.4vh,30px) clamp(16px,2vw,34px)}
+.dcard{background:linear-gradient(180deg,#0f3157,#0a2140);color:#fff;border-radius:26px;border:3px solid #9fe8ff;box-shadow:0 0 0 2px var(--halo),0 0 30px var(--halo),inset 0 0 40px rgba(41,171,226,.12),0 16px 34px rgba(0,0,0,.45);padding:clamp(14px,2.4vh,30px) clamp(16px,2vw,34px)}
+.cmp small,.ask small{display:block;font-family:var(--titre);font-weight:700;letter-spacing:.14em;font-size:clamp(11px,1.25vw,22px);color:#1f78b4;margin-bottom:.3em}
+.ask{width:min(1100px,94%);font-weight:700;font-size:clamp(15px,1.9vw,30px);line-height:1.3}
+.ask b{color:#d05c00}
+.funnel{display:grid;gap:clamp(6px,1.5vh,16px);justify-items:center;width:min(1300px,94%)}
+.funnel .pill{justify-content:center;font-size:clamp(14px,min(1.8vw,3vh),30px)}
+
+/* Chapitre 2 : réseau et chemins vers les mots */
+#plan svg.net2{width:min(1300px,96%);height:auto;max-height:56vh;overflow:visible}
+#plan svg text{font-family:var(--texte);font-weight:700}
+.net line{stroke:rgba(116,210,250,.36);stroke-width:1.2;stroke-dasharray:4 6;animation:flux .8s linear infinite}
+.net circle{fill:#0d2f55;stroke:#6fdcff;stroke-width:1.6}
+.cp{fill:none;stroke:#3fd0ff;stroke-linecap:round;transition:stroke .3s;filter:drop-shadow(0 0 5px rgba(63,208,255,.55))}
+.cw circle{fill:#6fdcff;transition:fill .3s}.cwt{fill:#fff;transition:fill .3s}.cf{fill:#b9e6fa}
+.cw.win .cp{stroke:var(--orange);filter:drop-shadow(0 0 8px rgba(255,140,20,.9))}.cw.win circle,.cw.win .cwt{fill:var(--orange)}
+.lab{fill:#3fd0ff;letter-spacing:.14em}
+
+/* Chapitre 4 : notice et lignes de statut */
+.cmp{display:grid;grid-template-columns:minmax(0,.86fr) minmax(0,1fr);gap:clamp(16px,2.6vw,44px);width:min(1560px,95%);align-items:center}
+.notice{position:relative;transform:rotate(-1deg)}
+#plan .notice[data-s]{transform:rotate(-1deg) translateY(12px)}#plan .notice[data-s].on{transform:rotate(-1deg)}
+.notice h3{font-size:clamp(22px,2.9vw,50px);line-height:1.1;margin-bottom:.35em}
+.notice h3 i{font-family:var(--texte);font-weight:600;font-size:.55em;color:#1f78b4}
+.notice ul,.ans ul{list-style:none;margin:0;padding:0;display:grid;gap:clamp(7px,1.4vh,16px)}
+.notice li{font-weight:700;font-size:clamp(15px,1.95vw,34px);padding:.2em .5em .2em .7em;border-left:.22em solid #8fd8f5;border-radius:0 .5em .5em 0}
+.notice li:first-child{border-color:var(--orange);background:linear-gradient(90deg,#ffe2bd,#fdeeda)}
+.notice .deco{position:absolute;right:-5%;top:-22%;width:27%;transform:rotate(9deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.4))}
+.ans small{color:#3fd0ff;text-shadow:0 0 14px rgba(63,208,255,.5)}
+.srow{display:flex;align-items:center;gap:.7em;background:linear-gradient(180deg,#103257,#0a2140);border:3px solid #9fe8ff;border-radius:1.1em;padding:.4em 1em .45em .7em;box-shadow:0 0 0 2px var(--halo),0 0 22px var(--halo),0 8px 18px rgba(0,0,0,.4);font-size:clamp(14px,1.75vw,30px)}
+.srow.ko{border-color:#ffc27a;box-shadow:0 0 0 2px var(--halo-o),0 0 22px var(--halo-o),0 8px 18px rgba(0,0,0,.4)}
+.srow .ic{flex:none;width:2em;height:2em;display:grid;place-items:center;padding-right:.6em;border-right:2px solid rgba(255,255,255,.35);box-sizing:content-box}
+.srow .ic .gi{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 5px rgba(0,0,0,.4))}
+.srow .ic .fb{width:1.6em;height:1.6em;border-radius:50%;background:#22c36b;color:#fff;font-style:normal;font-weight:800;text-align:center;line-height:1.6em}
+.srow.ko .ic .fb{background:var(--orange);color:#0b2440}
+.srow b{display:block;font-family:var(--titre);font-weight:700;font-size:1.12em;line-height:1.15}
+.srow b em{font-style:normal;font-size:.72em;color:#5fd6ff}
+.srow.ko b em{color:#ffa733}
+.srow span{font-size:.82em;color:#e8f4fb}
+
+/* Accueil et fin */
+.ov{position:absolute;inset:0;z-index:20;display:none;overflow-y:auto}
+.ov.show{display:flex}
+#menu{background:radial-gradient(rgba(116,210,250,.14) 1px,transparent 1.5px) 0 0/22px 22px,linear-gradient(90deg,rgba(8,20,40,.97) 0%,rgba(10,30,58,.93) 48%,rgba(10,30,58,.55) 100%);align-items:center;gap:3%;padding:28px clamp(20px,4.5vw,72px)}
+.logo{position:absolute;right:26px;top:20px;font-family:var(--titre);font-weight:700;font-size:20px;letter-spacing:.01em}
+.mcol{flex:1 1 60%;max-width:860px;min-width:0}
+.mhero{flex:1 1 34%;display:grid;place-items:center;min-width:0}
+.mhero .gi,.mhero svg.fb{width:min(100%,440px);max-height:70vh;object-fit:contain;filter:drop-shadow(0 0 34px rgba(63,208,255,.45)) drop-shadow(0 22px 26px rgba(0,0,0,.5));animation:bob 4s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-12px)}}
+#menu h1{font-size:clamp(36px,5.6vw,84px);line-height:1.02;margin:8px 0 12px}
+#menu .lead{max-width:56ch;font-size:clamp(14px,1.25vw,18px);color:#d8eefa}
+.pick{margin-top:20px}
+.pick h2{font-family:var(--titre);font-size:clamp(12px,1.1vw,16px);font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#3fd0ff;margin-bottom:12px}
+.profs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.prof{position:relative;display:flex;align-items:center;gap:12px;text-align:left;background:linear-gradient(180deg,#0f3157,#0a2140);border:2.5px solid #9fe8ff;border-radius:18px;padding:11px 14px;box-shadow:0 0 0 1.5px var(--halo),0 0 16px rgba(63,208,255,.4),0 8px 16px rgba(0,0,0,.35);transition:transform .18s,box-shadow .18s,background .18s,border-color .18s}
+.prof .ic{flex:none;width:48px;height:48px;display:grid;place-items:center}
+.prof .ic .gi{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 3px 5px rgba(0,0,0,.4))}
+.prof .ic .fb{width:34px;height:34px;border-radius:10px;background:rgba(116,210,250,.22);border:2px solid var(--cyan)}
+.prof b{display:block;font-family:var(--titre);font-weight:700;font-size:clamp(14px,1.25vw,18px);line-height:1.15}
+.prof small{font-size:12.5px;color:#b9dff3}
+.prof .chk{position:absolute;right:-10px;top:-10px;width:28px;height:28px;border-radius:50%;background:var(--orange);color:#0b2440;font-style:normal;font-weight:800;display:grid;place-items:center;transform:scale(0);transition:transform .2s cubic-bezier(.2,1.6,.4,1);box-shadow:0 0 14px var(--halo-o)}
+.prof:hover{transform:translateY(-2px)}
+/* Poste sélectionné : bordure et halo orange, fond éclairci, léger agrandissement, pastille cochée */
+.prof[aria-pressed="true"]{transform:scale(1.04);background:linear-gradient(180deg,#1c5288,#14406e);border-color:#ffc27a;box-shadow:0 0 0 2.5px var(--halo-o),0 0 30px var(--halo-o),0 10px 20px rgba(0,0,0,.4)}
+.prof[aria-pressed="true"] .chk{transform:scale(1)}
+.gowrap{position:relative;display:inline-block;margin-top:66px}
+.btn{border:2.5px solid #ffd9a6;border-radius:18px;padding:12px 24px;font-family:var(--titre);font-weight:700;font-size:16px;background:linear-gradient(180deg,#ffb23e,#ff8000 60%,#e86a00);color:#0b2440;box-shadow:inset 0 2px 0 rgba(255,255,255,.55),0 0 0 2px var(--halo-o),0 0 22px var(--halo-o),0 6px 0 #a84a00}
+.btn:active{transform:translateY(4px);box-shadow:inset 0 2px 0 rgba(255,255,255,.55),0 0 0 2px var(--halo-o),0 2px 0 #a84a00}
+.btn.alt{background:linear-gradient(180deg,#103257,#0a2140);color:#fff;border-color:#9fe8ff;box-shadow:0 0 0 2px var(--halo),0 0 22px var(--halo),0 6px 0 #061528}
+.btn.big{font-size:clamp(18px,1.8vw,26px);padding:16px 36px;border-radius:22px}
+.btn:disabled{filter:grayscale(.75) brightness(.7);cursor:default}
+/* Flèche qui rebondit au-dessus du bouton, une fois le poste choisi */
+.arrow{position:absolute;right:-20px;top:-58px;width:56px;height:56px;opacity:0;transition:opacity .3s;pointer-events:none}
+.gowrap.ready .arrow{opacity:1;animation:rebond .9s ease-in-out infinite}
+.arrow .gi{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 10px var(--halo-o))}
+.arrow .fb{width:0;height:0;margin:12px auto 0;border-left:18px solid transparent;border-right:18px solid transparent;border-top:28px solid var(--orange);filter:drop-shadow(0 0 8px var(--halo-o))}
+@keyframes rebond{0%,100%{transform:translateY(-10px)}50%{transform:translateY(8px)}}
+.legal{font-size:clamp(10.5px,.95vw,15px);color:#c8dcea;font-style:italic;margin-top:10px}
+#menu .legal{max-width:62ch;margin-top:20px}
+#end{background:radial-gradient(rgba(116,210,250,.1) 1px,transparent 1.5px) 0 0/22px 22px,rgba(6,16,32,.86);align-items:center;justify-content:center;padding:28px clamp(18px,4vw,70px)}
+.endbox{width:min(1500px,100%);display:grid;grid-template-columns:minmax(0,.96fr) minmax(0,1fr);gap:clamp(16px,2.6vw,44px);align-items:stretch}
+.endbox h2{grid-column:1/-1;font-size:clamp(30px,4.4vw,72px);line-height:1}
+.paper{--pl:clamp(48px,5vw,90px);--ml:clamp(30px,3.4vw,62px);position:relative;font-family:var(--main);color:var(--encre);font-size:clamp(20px,2.3vw,40px);line-height:1.2;padding-left:var(--pl)}
+.paper::before{content:"";position:absolute;left:var(--ml);top:0;bottom:0;border-left:3px solid var(--orange)}
+.paper h3{font-family:var(--main);font-size:1.25em;color:#e2620a;text-decoration:underline;text-underline-offset:.14em;margin-bottom:.3em}
+.paper p{margin:.45em 0;position:relative}
+.paper p::before{content:"";position:absolute;left:calc(var(--ml) - var(--pl) - 6px);top:.42em;width:14px;height:14px;border-radius:50%;background:var(--orange)}
+.endbox .dcard h3{font-size:clamp(16px,1.95vw,34px);color:#6fdcff;margin:.1em 0 .4em}
+.copy{background:linear-gradient(180deg,#fdf6e6,#f1e6cd);color:#0b2440;border-left:.5em solid var(--orange);border-radius:.7em;padding:.5em .8em;font-weight:700;font-size:clamp(14px,1.55vw,27px);line-height:1.3;margin-bottom:.7em;box-shadow:0 6px 14px rgba(0,0,0,.3)}
+.stat{font-weight:700;font-size:clamp(13px,1.45vw,25px);margin-bottom:.6em}
+.sig{font-family:var(--titre);font-weight:700;color:#6fdcff;font-size:clamp(17px,2.1vw,36px);margin-bottom:.4em}
+.row{display:flex;flex-wrap:wrap;gap:18px}
+.endbox .row{grid-column:1/-1;align-items:center}
+.endbox .btn{font-size:clamp(16px,1.9vw,30px);padding:.5em 1.4em}
+/* Logo Elliacare officiel (images/logo_elliacare.png, fond transparent) */
+.brand{display:block;width:clamp(70px,7vw,132px);aspect-ratio:1893/1000;background:url(images/logo_elliacare.png) center/contain no-repeat;pointer-events:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,.4))}
+#plan>.brand{position:absolute;left:clamp(14px,2vw,34px);top:clamp(10px,1.6vh,22px)}
+.endbox{position:relative}.endbox>.brand{position:absolute;right:0;top:0}
+/* Illustrations générées posées sur les cartes, avec ombre portée */
+.pcard,.dcard{position:relative}
+.ask .deco{position:absolute;left:-10%;top:6%;width:12%;transform:rotate(-8deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
+.notice .deco2{position:absolute;left:-9%;bottom:-24%;width:25%;transform:rotate(-10deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
+.paper .deco{position:absolute;right:-5%;bottom:-11%;width:27%;transform:rotate(6deg);filter:drop-shadow(0 12px 16px rgba(0,0,0,.5))}
+.row .peek{margin-left:auto;height:clamp(90px,17vh,190px);width:auto;margin-top:-4vh;filter:drop-shadow(0 0 18px rgba(63,208,255,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45))}
+.orig .oic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;box-shadow:inset 0 2px 0 rgba(255,255,255,.45),0 2px 5px rgba(1,35,63,.25)}
+.oic .gi{width:86%;height:86%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
+.oic .fb{width:12px;height:12px;border-radius:3px;background:rgba(255,255,255,.85)}
+/* avatar du poste choisi dans le bandeau, flèche animée dans l'indication */
+#hud{display:flex;align-items:center;gap:10px}
+#rav{flex:none;width:48px;height:48px;object-fit:contain;filter:drop-shadow(0 2px 4px rgba(0,0,0,.4))}
+#hint{display:flex;align-items:center;gap:8px}
+#faces h3{display:flex;align-items:center;gap:6px}
+.hico{width:22px;height:22px;object-fit:contain;margin:-4px 0}
+.harrow{width:26px;height:26px;object-fit:contain;animation:rebond2 .9s ease-in-out infinite}
+@keyframes rebond2{0%,100%{transform:translateY(-4px)}50%{transform:translateY(4px)}}
+#roll .gi{width:50px;height:50px;object-fit:contain;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4))}
+#roll svg.fb{display:none}#roll .gi[data-miss]+svg.fb{display:block}
+.glabel span{display:flex;align-items:center;gap:5px}
+.tico{width:20px;height:24px;object-fit:contain;margin:-6px 0}
+/* Page de garde : l'image fournie (images/accueil.webp) occupe tout l'écran sans déformation ; seules des zones cliquables s'y superposent */
+#menu{background:#06142a;align-items:center;justify-content:center;padding:0;gap:0;overflow:hidden}
+.home{position:relative;aspect-ratio:1672/941;width:min(100vw,calc(100vh*1672/941));container-type:size}
+.home img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.hot{position:absolute;border:0;padding:0;background:transparent;border-radius:1cqw;transition:box-shadow .2s,background .2s,transform .2s}
+.hot:hover{box-shadow:inset 0 0 0 .16cqw rgba(170,236,255,.95),0 0 1.4cqw rgba(116,210,250,.75);background:rgba(116,210,250,.08)}
+/* poste choisi : bordure et lueur orange, léger agrandissement */
+.hot[aria-pressed="true"]{box-shadow:inset 0 0 0 .28cqw #ffb35c,0 0 1.6cqw rgba(255,140,20,1),0 0 3.6cqw rgba(255,128,0,.65);background:rgba(255,128,0,.16);transform:scale(1.025)}
+@keyframes choisi{50%{box-shadow:inset 0 0 0 .2cqw #ffd09a,0 0 2.2cqw rgba(255,150,30,1),0 0 4.6cqw rgba(255,128,0,.7)}}
+/* "Infirmier" est orange dans l'image : quand un autre poste est choisi, sa carte est ramenée au bleu des autres */
+.hot.base[aria-pressed="false"]{-webkit-backdrop-filter:grayscale(1) sepia(1) hue-rotate(165deg) saturate(2.4);backdrop-filter:grayscale(1) sepia(1) hue-rotate(165deg) saturate(2.4);background:rgba(12,52,96,.16);box-shadow:inset 0 0 0 .14cqw rgba(120,215,255,.7),0 0 0 .5cqw rgba(8,30,58,.5)}
+/* "Prendre son poste" : le bouton de l'image est repris en découpe. Au survol seulement, il grossit très légèrement et un halo apparaît, sans liseré ni clignotement */
+#go{position:absolute;left:51.79%;top:84.8%;width:45.57%;height:12.33%;border:0;padding:0;margin:0;border-radius:2cqw;background:url(images/accueil.webp) 95.15% 96.73%/219.44% 811% no-repeat;transition:transform .18s,box-shadow .18s}
+#go:hover,#go:focus-visible{transform:scale(1.025);box-shadow:0 0 2.6cqw rgba(255,150,30,.85),0 0 5.5cqw rgba(255,128,0,.45)}
+#go:active{transform:scale(1.01)}
+/* tampon « PROBABLE » : la réponse vient de la notice officielle */
+.stamp.pr{border-color:var(--vif);color:var(--moyen)}
+/* tampon « VÉRIFIÉ » : au chapitre 3, la réponse vient de la source de référence choisie par le joueur */
+.stamp.ok{border-color:#1f9d57;color:#167a43}
+/* accueil : bouton discret pour réécouter ou couper la voix de présentation */
+#ecoute{position:absolute;left:3.47%;top:91.6%;font-family:var(--titre);font-weight:600;font-size:1.05cqw;color:#dff3fd;background:rgba(8,30,58,.78);border:.12cqw solid rgba(120,215,255,.7);border-radius:99px;padding:.45cqw 1.3cqw}
+#ecoute:hover{background:rgba(20,64,110,.9)}
+/* rendu allégé sur les ordinateurs lents : plus de flou derrière les panneaux */
+.lowfx .glass{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(1,29,52,.94)}
+/* accueil : le vrai logo Elliacare recouvre celui de l'image */
+.hlogo{position:absolute;left:86.4%;top:0;width:12.4%;height:11.2%;background:radial-gradient(ellipse at 50% 46%,#01182d 66%,rgba(1,24,45,0) 100%)}
+.hlogo::after{content:"";position:absolute;inset:13% 11% 9%;background:url(images/logo_elliacare.png) center/contain no-repeat}
+/* Agrandissement de l'interface de jeu : --K vaut 2 sur un grand écran (1920 x 1080), moins sur un écran plus petit, 1 sur téléphone */
+#left,#card,#console{zoom:var(--K,1)}#faces{zoom:calc(var(--K,1)*.72)}#tools{zoom:calc(var(--K,1)*.7)}
+/* la consigne est la première ligne de la console ; la carte Sources est compacte (une ligne par source, une seule ligne tant qu'elle est verrouillée) */
+#console{flex-direction:column;align-items:stretch;gap:10px}
+.crow{display:flex;align-items:center;gap:26px}
+.srcs button{padding:4px 28px 4px 5px}.srcs .ic{width:32px;height:32px}.srcs small{display:none}
+.srcard.locked .srcs button:not([aria-pressed="true"]){display:none}
+#bubble{font-size:calc(13.5px*var(--K,1));max-width:calc(230px*var(--K,1));padding:calc(8px*var(--K,1)) calc(13px*var(--K,1))}
+#pop b{font-size:calc(34px*var(--K,1))}#pop span{font-size:calc(14px*var(--K,1))}#pop small{font-size:calc(10.5px*var(--K,1))}
+/* consigne : dit toujours quoi faire ensuite, dans la carte de résultat et au-dessus de la console */
+.todo{display:flex;align-items:center;gap:8px;margin-top:10px;padding:7px 10px;border-radius:10px;background:#FFF1E0;border:2px solid var(--orange);font-family:var(--titre);font-weight:700;font-size:14.5px;line-height:1.25;color:#7a3a00;opacity:0;transition:opacity .4s}
+#card.t2 .todo{opacity:1}
+.todo span{flex:1}
+#card .todo .btn{margin:0;opacity:1;font-size:15px;padding:9px 18px;white-space:nowrap;border-width:1.5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 2px 0 #a84a00,0 3px 8px rgba(120,60,0,.25)}
+#card .todo .btn:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.45),0 0 0 #a84a00}
+#console #hint{position:static;display:none;opacity:1;font-family:var(--titre);font-weight:700;font-size:15px;line-height:1.25;border:2px solid var(--orange);border-radius:12px;background:rgba(255,128,0,.16);padding:8px 12px;white-space:normal}
+#console #hint.show{display:flex}
+/* la flèche de la consigne est à droite, juste au-dessus du bouton « Lancer le dé » */
+#console #hint .harrow{order:2;margin-left:auto;margin-right:118px}
+#console #hint.gauche .harrow{order:0;margin-left:104px;margin-right:14px}
+/* la consigne ne doit pas élargir la console : elle prend la largeur de la rangée de commandes et passe à la ligne */
+#console #hint{width:0;min-width:100%}
+/* question quiz : trois réponses cliquables, puis l'explication et le bouton Continuer */
+.quiz{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.5fr);gap:6%;align-items:center;width:min(1400px,94%)}
+.qopts{display:grid;gap:clamp(10px,2.2vh,24px)}
+.qopt{width:100%;text-align:left;cursor:pointer;transition:transform .15s,filter .3s,box-shadow .3s,background .3s}
+.qopt:hover:not(:disabled){transform:translateX(8px)}
+.qopt .ic b{font-family:var(--titre);font-size:1.2em;color:#F26F00}
+/* réponses du quiz : fond bleu très clair en léger dégradé, liseré bleu un peu plus foncé, texte foncé, lettres en orange */
+.pill.qopt{--c1:#f3fbff;--c2:#cdeafa;--g:rgba(41,171,226,.45);border-color:#4fb3e3;color:#0b2440}
+.quiz{margin-top:clamp(20px,6vh,70px)}
+/* l'explication et le bouton restent sous la colonne des réponses, sans passer sur le perroquet */
+.qend{width:min(1400px,94%);padding-right:29%;box-sizing:border-box}
+.qopt:disabled{cursor:default}
+.qopt.ok{--c1:#a8f3c8;--c2:#2fcf78;--g:rgba(47,207,120,.85)}
+.qopt.ko{--c1:#ffb23e;--c2:#ff8000;--g:var(--halo-o)}
+.qopt.off{filter:grayscale(.85) brightness(.72)}
+.quiz{align-items:start}
+.quiz .mascot{height:min(29vh,24vw)}
+#plan h2.qh{font-size:clamp(22px,3.5vw,60px);line-height:1.1;max-width:min(1500px,94%);text-wrap:balance}
+#plan h2.qh em{white-space:nowrap}
+.qend{display:flex;flex-direction:column;align-items:center;gap:clamp(8px,1.6vh,16px);min-height:9.5em}
+.qend .say{font-size:clamp(15px,1.9vw,30px)}
+.qend .btn{font-size:clamp(16px,1.7vw,26px);padding:.5em 1.6em;margin-top:clamp(14px,4vh,44px)}
+/* relief allégé sur tous les boutons */
+.btn{box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 0 1.5px var(--halo-o),0 0 14px rgba(255,140,20,.45),0 3px 0 #a84a00}
+.btn:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 0 0 1.5px var(--halo-o),0 1px 0 #a84a00}
+.btn.alt{box-shadow:0 0 0 1.5px var(--halo),0 0 14px rgba(63,208,255,.4),0 3px 0 #061528}
+.inquiz #skip{display:none}
+/* fin : bandeau de félicitations */
+.bravo{grid-column:1/-1;display:flex;align-items:center;gap:clamp(12px,1.6vw,26px);background:linear-gradient(180deg,rgba(12,30,56,.96),rgba(8,20,40,.96));border:3px solid #ff9a1f;border-radius:22px;padding:clamp(10px,1.6vh,18px) clamp(14px,2vw,30px);box-shadow:inset 0 0 0 2px rgba(255,200,120,.3),0 0 26px var(--halo-o),0 10px 26px rgba(0,0,0,.45);font-family:var(--titre);font-weight:600;font-size:clamp(15px,1.9vw,30px);line-height:1.25}
+.bravo b{display:block;color:var(--orange);font-size:1.15em}
+.bravo .peek{flex:none;height:clamp(70px,13vh,150px);width:auto;margin:0;filter:drop-shadow(0 0 16px rgba(63,208,255,.5))}
+#nogl{display:none;position:absolute;inset:0;z-index:30;background:var(--nuit);align-items:center;justify-content:center;padding:30px;text-align:center;font-weight:600}
+
+@media (max-width:900px){
+  .p1{gap:5%}.mascot{height:34vh}
+  #left{left:8px;top:8px;width:58%;gap:6px}#hud{padding:7px 10px}
+  .srcard{padding:7px 8px}.srcard h3{margin-bottom:5px}.srcs{gap:4px}.srcs button{padding:3px 24px 3px 4px;font-size:11.5px;border-radius:10px}.srcs .ic{width:24px;height:24px;border-radius:7px}.srcs small{display:none}
+  #tools{right:8px;top:8px}#tools button{padding:6px 9px;font-size:11.5px}
+  #console{left:8px;right:8px;bottom:8px;max-width:none;flex-wrap:wrap;gap:12px 14px;padding:12px}
+  .crow{flex-wrap:wrap;gap:12px}
+  .gauge,.gauge.wide{flex:1 1 100%;width:auto}
+  #roll{flex:1 1 100%;justify-content:center;font-size:17px;padding:13px}#roll kbd{display:none}#roll svg{width:30px;height:30px}
+  #hint{display:none}
+  #faces{top:64px;right:8px;width:128px;padding:8px}#faces h3{font-size:9.5px}.leg span{display:none}.leg{grid-template-columns:12px auto;display:inline-grid;margin-right:6px}
+  #card{top:8px;left:8px;right:8px;width:auto}
+  .cmp,.endbox{grid-template-columns:minmax(0,1fr)}
+  #plan{justify-content:flex-start;padding-top:56px;overflow-y:auto}
+  #end{align-items:flex-start}
+}
+@media (max-width:520px){.profs{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="view" class="idle">
+    <canvas id="gl" aria-label="Scène 3D : un bureau, un ordinateur portable, un carnet, un perroquet et un dé à 20 faces"></canvas>
+    <div class="vignette"></div>
+    <div class="bars"><i></i><i></i></div>
+    <div id="layer">
+      <div id="left">
+        <div id="hud" class="glass"><img id="rav" class="gi" alt="" onerror="this.dataset.miss=1"><div><div class="tag" id="chtag"></div><div class="obj"><span id="objtxt"></span><span class="pips" id="pips"><i></i><i></i><i></i><i></i></span></div></div></div>
+        <div id="gS" class="glass srcard"><h3>Sources</h3><div class="srcs" id="srcs" role="group" aria-label="Sources autorisées"></div><span class="lock">Se débloque au chapitre 3</span></div>
+      </div>
+      <div id="tools"><button id="snd" class="glass" aria-pressed="true">Son : activé</button><button id="quit" class="glass">Menu</button></div>
+      <div id="card" aria-live="polite"></div>
+      <div id="console" class="glass hide">
+        <div id="hint"></div>
+        <div class="crow">
+        <div class="gauge" id="gT">
+          <label class="glabel" for="temp"><span><img class="gi tico" src="images/generated/thermometre.png" alt="" onerror="this.dataset.miss=1">Température</span><b id="tname">Tiède</b></label>
+          <input type="range" id="temp" min="0" max="100" value="55">
+          <div class="gends"><span>Froid : prudent</span><span>Chaud : audacieux</span></div>
+          <span class="lock">Se débloque au chapitre 2</span>
+        </div>
+        <button id="roll"><img class="gi" src="images/generated/de20.png" alt="" onerror="this.dataset.miss=1"><svg class="fb" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l8.7 5v10L12 22l-8.7-5V7z M12 7l5 8.5H7z M12 2v5 M3.3 7L7 15.5 M20.7 7L17 15.5 M7 15.5L12 22l5-6.5 M3.3 17L7 15.5 M20.7 17L17 15.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg><span>Lancer le dé</span><kbd>Espace</kbd></button>
+        </div>
+      </div>
+      <div id="faces" class="glass hide"><h3><img class="gi hico" src="images/generated/de20.png" alt="" onerror="this.dataset.miss=1">Les 20 faces du dé</h3><svg id="netd20" role="img" aria-label="Les 20 faces du dé, colorées selon l'origine du mot qu'elles portent"></svg><div id="leg"></div></div>
+    </div>
+    <div id="bubble"></div>
+    <div id="pop" class="glass"><small>FACE</small><b id="popn">14</b><span id="popw"></span></div>
+    <div id="fade"></div>
+    <div id="plan"></div>
+    <div id="caption"></div>
+    <button id="skip">Passer</button>
+    <div id="nogl">La 3D ne peut pas s'afficher dans ce navigateur. Ouvrez le jeu dans une version récente de Chrome, Edge, Safari ou Firefox.</div>
+  </div>
+
+  <div id="menu" class="ov show">
+    <div class="home">
+      <img src="images/accueil.webp" alt="Le Perroquet de garde. Comprendre comment l'IA raisonne. 7 h 42 : une question, un assistant IA, un perroquet et un dé à 20 faces. Choisissez votre poste.">
+      <i class="hlogo" role="img" aria-label="Elliacare"></i><div id="profs"></div><button id="ecoute" hidden>Écouter la présentation</button>
+      <button id="go" aria-label="Prendre son poste"></button>
+    </div>
+  </div>
+  <div id="end" class="ov"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+/* ---------- Données : cas 100 % fictifs ---------- */
+/* Familles de sources (couleur des faces du dé) */
+const FAM=[{n:"Notice officielle, HAS",c:"#29ABE2"},{n:"Publications scientifiques",c:"#74D2FA"},{n:"Sites santé grand public",c:"#FFD9B0"},{n:"Forums, réseaux sociaux",c:"#FF8000"}];
+/* Réglage "sources" : nom, description, phrase ajoutée à la demande, couleur */
+const SRC=[
+ {n:"Tout Internet",d:"Forums, réseaux, blogs : tout est mélangé",ic:"ico_reseau",add:"",c:"#FF8000",c1:"#ffb23e",g:"rgba(255,140,20,.8)"},
+ {n:"Sites santé",d:"Grand public et presse",ic:"ico_site_sante",add:"Appuie-toi sur des sites de santé reconnus.",c:"#e9d9b8",c1:"#fbf3df",g:"rgba(240,225,190,.6)"},
+ {n:"Publications scientifiques",d:"Académiques, relues par des pairs",ic:"ico_science",add:"Appuie-toi uniquement sur des publications scientifiques.",c:"#7fd4f6",c1:"#c9f1ff",g:"rgba(116,210,250,.7)"},
+ {n:"Notice officielle, HAS",d:"La source qui fait foi",ic:"ico_notice",add:"Appuie-toi uniquement sur la notice officielle et les recommandations de la HAS.",c:"#2bb4ea",c1:"#8fe3ff",g:"rgba(63,208,255,.75)"}];
+/* Poids des 6 réponses candidates selon les sources autorisées (0 = le mot disparaît du dé) */
+const WEI=[[22,3,6,4,9,8,14,12,12,10],[40,5,12,6,20,17,0,0,0,0],[56,10,20,14,0,0,0,0,0,0],[84,8,5,3,0,0,0,0,0,0]];
+/* Réponse candidate = [texte, famille, conforme à la notice ?, origine]. Dix réponses par poste, dans cet ordre fixe :
+   0 notice, 1 ancienne notice, 2 et 3 études, 4 site grand public, 5 encyclopédie en ligne, 6 et 7 forums, 8 et 9 réseaux sociaux.
+   Les réponses "forum" et "réseau social" sont volontairement farfelues : improbables, mais dites avec aplomb. */
+const ROLES=[
+ {name:"Infirmier, infirmière",ic:"role_infirmier",doc:"Effets indésirables d'un médicament",q:"Quel est l'effet indésirable le plus fréquent du Calmidol ?",pre:"Avec le Calmidol, on observe surtout",
+  c:[["une somnolence",0,1,"la notice officielle"],["des maux de tête",0,0,"une ancienne version de la notice"],["des nausées",1,0,"une étude : effet réel, mais moins fréquent"],["une bouche sèche",1,0,"une étude menée sur 12 patients"],["une chute de cheveux",2,0,"un blog bien-être"],["des vertiges au réveil",2,0,"une encyclopédie en ligne, modifiée la veille"],["une prise de poids rapide",3,0,"un forum : l'avis d'une seule personne"],["des ongles qui poussent plus vite",3,0,"un forum où l'on parlait d'un autre médicament"],["des rêves en couleur",3,0,"une vidéo sur un réseau social"],["une envie irrésistible de sucre",3,0,"un message devenu viral"]],
+  notice:["Très fréquent : somnolence.","Fréquent : nausées, bouche sèche.","Rare : maux de tête."]},
+ {name:"Pharmacien, pharmacienne",ic:"role_pharmacien",doc:"Dose maximale par jour",q:"Quelle est la dose maximale de Calmidol par jour chez l'adulte ?",pre:"Chez l'adulte, la dose maximale de Calmidol est de",
+  c:[["3 comprimés par jour",0,1,"la notice officielle"],["2 comprimés par jour",0,0,"une ancienne version de la notice"],["4 comprimés par jour",1,0,"une étude menée avec un autre dosage"],["3 comprimés un jour sur deux",1,0,"une étude sur des patients très âgés"],["1 comprimé par jour",2,0,"un site grand public, qui confond avec la forme enfant"],["5 comprimés par jour",2,0,"une encyclopédie en ligne, chiffre non sourcé"],["6 comprimés par jour",3,0,"un forum : « moi, j'en prends 6 et ça va »"],["1 comprimé par tranche de 10 kilos",3,0,"un forum de sportifs"],["8 comprimés par jour",3,0,"une vidéo sur un réseau social"],["2 comprimés avant chaque repas, goûter compris",3,0,"un message devenu viral"]],
+  notice:["Adulte : 3 comprimés par jour au maximum.","Espacer les prises d'au moins 6 heures.","Enfant : forme pédiatrique uniquement."]},
+ {name:"Médecin",ic:"role_medecin",doc:"Contre-indication principale",q:"Quelle est la principale contre-indication du Calmidol ?",pre:"La principale contre-indication du Calmidol est",
+  c:[["l'insuffisance rénale sévère",0,1,"la notice officielle"],["le diabète",0,0,"une ancienne version de la notice"],["l'insuffisance hépatique",1,0,"une étude sur une molécule voisine"],["un âge supérieur à 80 ans",1,0,"une étude menée sur un petit groupe"],["l'hypertension artérielle",2,0,"un site grand public"],["le premier trimestre de grossesse",2,0,"une encyclopédie en ligne, phrase non sourcée"],["l'allergie au pollen",3,0,"un forum : l'avis d'une seule personne"],["le fait d'être gaucher",3,0,"un forum : une théorie personnelle"],["la prise de vitamine C",3,0,"une vidéo sur un réseau social"],["la consommation de café",3,0,"un message devenu viral"]],
+  notice:["Contre-indication : insuffisance rénale sévère.","Précaution d'emploi : insuffisance hépatique.","Diabète : aucune contre-indication."]},
+ {name:"Cadre de santé",ic:"role_cadre",doc:"Conservation après ouverture",q:"Après ouverture, combien de temps se conserve le sirop Calmidol ?",pre:"Après ouverture, le sirop Calmidol se conserve",
+  c:[["15 jours au réfrigérateur",0,1,"la notice officielle"],["28 jours au réfrigérateur",0,0,"une ancienne version de la notice"],["30 jours au réfrigérateur",1,0,"une étude sur un autre conditionnement"],["10 jours à l'abri de la lumière",1,0,"une étude menée en laboratoire"],["7 jours à température ambiante",2,0,"un site grand public"],["3 mois, bouchon bien fermé",2,0,"une encyclopédie en ligne, chiffre non sourcé"],["6 mois dans l'armoire",3,0,"un forum : l'avis d'une seule personne"],["tant que sa couleur ne change pas",3,0,"un forum : une astuce de grand-mère"],["jusqu'à la date de péremption",3,0,"une vidéo sur un réseau social"],["un an au congélateur",3,0,"un message devenu viral"]],
+  notice:["Après ouverture : 15 jours au réfrigérateur.","Noter la date d'ouverture sur le flacon.","Avant ouverture : à température ambiante."]}
+];
+const CH={1:{t:"Il a tout lu",h:"L'IA a <em>tout lu</em>"},2:{t:"Elle prédit",h:"Elle ne sait pas, elle <em>prédit</em>"},3:{t:"Cadrer les sources",h:"Une phrase pour <em>cadrer les sources</em>"},4:{t:"Vérifier",h:"Retour à <em>la source</em>"}};
+/* Vérités affichées une à une, après chaque lancer */
+const TRUTHS={1:["L'IA a appris sur une immense partie d'Internet. Tout n'y est pas vrai."],
+ 2:["À froid, l'IA choisit presque toujours le mot le plus probable. Probable ne veut pas dire vérifié.","À chaud, l'improbable devient possible : même question, autre réponse."],
+ /* chapitre 3 : une vérité par niveau de sources testé */
+ 3:["Sans consigne sur les sources, la réponse peut venir de n'importe où.","Un site grand public simplifie : c'est mieux, mais pas encore fiable.","Une étude est sérieuse, mais elle ne répond pas toujours à votre question.","Avec la notice et la HAS pour seules sources, la bonne réponse sort le plus souvent."]};
+/* Question quiz posée après un chapitre (clé = numéro du chapitre qui vient de se terminer) : titre, réponses, indice de la bonne réponse, explication, clé de voix off */
+const QUIZ={2:{h:"À votre avis, combien de mots l'IA <em>passe-t-elle en revue</em> avant d'écrire le suivant ?",o:["Les 5 mots les plus évidents","Une centaine de mots","Des dizaines de milliers, à chaque mot"],a:2,x:"À chaque mot, l'IA donne une probabilité à tout son vocabulaire : des dizaines de milliers de fragments de mots. Puis elle en tire un.",vo:"q1"}};
+/* Notes écrites à la main dans le carnet, une par chapitre */
+const NOTE_TXT=["L'IA a tout lu : le vrai comme le faux.","L'IA est probabiliste. Elle prédit, elle ne sait pas.","Dans chaque demande : une phrase pour limiter les sources.","L'IA propose, le professionnel dispose."];
+/* Voix off : [texte du sous-titre, étape de l'infographie à révéler, plan de coupe 3D facultatif]. Fichiers attendus : audio/vo_<clé>.mp3 (ou .wav). Sans fichier, seuls les sous-titres défilent. */
+const VO={
+ intro:[["Sept heures quarante-deux. Votre bureau."],["Une question simple, et un assistant IA prêt à répondre."],["Avant de lui faire confiance, regardons comment il s'y prend."]],
+ c1a:[["Pour apprendre à écrire, l'IA a lu une immense partie d'Internet.",0],
+  ["D'abord, des notices officielles. Des textes validés, datés, relus avant d'être publiés.",1],
+  ["Des publications scientifiques. Relues par des pairs, mais parfois contredites quelques années plus tard.",2],
+  ["Des encyclopédies en ligne, comme Wikipédia. Chacun peut y contribuer : les avis divergent, et vous ne trouverez pas une réponse fiable ou adaptée à votre situation.",3]],
+ t1:[["Vous n'êtes pas sans savoir que sur Internet, on ne trouve pas que des choses vraies. D'où l'importance de vérifier les sources, pour s'assurer que la réponse générée par l'IA provient d'informations fiables."]],
+ t2a:[["À froid, l'IA joue la prudence : elle choisit presque toujours le mot le plus probable. Mais attention : le plus probable n'est pas forcément le plus juste."]],
+ t2b:[["À chaud, l'IA ose davantage. Même question, autre réponse : l'improbable devient possible, et parfois le farfelu aussi."]],
+ t3a:[["Sans consigne sur les sources, la réponse peut venir de n'importe où : d'un forum, d'une vidéo, d'un avis isolé."]],
+ t3b:[["Un site grand public simplifie pour être lu par tous. C'est mieux, mais ce n'est pas encore une source de référence."]],
+ t3c:[["Une étude est sérieuse, mais elle ne répond pas toujours à votre question précise : autre dosage, autre population, autre contexte."]],
+ t3d:[["Avec la notice officielle et la Haute Autorité de santé pour seules sources, la bonne réponse sort le plus souvent. Le plus souvent, pas toujours : vérifier reste votre métier."]],
+ fin:[["Félicitations, vous avez maintenant terminé votre garde. Vous comprenez le côté probabiliste de l'IA : ce perroquet qui parle bien, mais ne comprend absolument pas ce qu'il dit."]],
+ accueil:[["Bienvenue dans ce jeu, qui va vous permettre de comprendre comment l'IA raisonne. Choisissez d'abord votre poste. Vous êtes aujourd'hui de garde de nuit, après une journée éprouvante, et vous avez fait le choix d'utiliser l'IA pour gagner du temps. Mais comprenez-vous vraiment comment elle fonctionne ? À vous : il ne reste plus qu'à cliquer sur « Prendre son poste »."]],
+ c1b:[["Des sites santé grand public. Utiles, mais simplifiés pour être lus par tous.",4],
+  ["Des forums, où une seule personne raconte son expérience, avec beaucoup d'assurance.",5],
+  ["Et des réseaux sociaux, où ce qui circule le plus n'est pas forcément ce qui est le plus vrai.",6],
+  ["L'IA a tout absorbé. Et elle a tout mélangé : le vrai comme le faux, sans étiquette.",7],
+  ["Posez-lui votre question, sans rien préciser. Et regardez d'où vient sa réponse.",8,"screen"]],
+ n1:[["Note à moi-même : l'IA a tout lu. Le vrai, comme le faux."]],
+ c2a:[["L'IA ne consulte pas une base de données. Elle ne va pas chercher la bonne fiche sur une étagère.",0,"shelf"],
+  ["Elle lit le début de la phrase, mot après mot.",1],
+  ["Puis elle évalue les mots qui pourraient suivre.",2],
+  ["Certains mots sont proches, donc très probables. D'autres sont lointains, mais restent possibles.",3]],
+ c2b:[["La température règle son audace. À froid, elle choisit presque toujours le favori.",4],
+  ["À chaud, tous les chemins s'ouvrent : l'improbable devient possible.",5],
+  ["Puis un tirage décide. C'est cela, un perroquet stochastique : il choisit un mot probable, pas un mot vérifié.",6],
+  ["Posez deux fois la même question : une fois à froid, une fois à chaud.",7,"parrotB"]],
+ n2:[["L'IA est probabiliste. Elle ne sait pas : elle prédit le mot suivant."]],
+ q1:[["À votre avis, combien de mots l'IA passe-t-elle en revue avant d'écrire le suivant ?"]],
+ q1r:[["À chaque mot, l'IA donne une probabilité à tout son vocabulaire : des dizaines de milliers de fragments de mots. Puis elle en tire un."]],
+ c3:[["Bonne nouvelle : vous pouvez cadrer votre demande.",1],
+  ["Sans consigne, l'IA puise partout : dans tout Internet.",2],
+  ["Vous pouvez la limiter aux sites de santé reconnus, ou aux publications scientifiques.",3],
+  ["Ou, mieux encore, à la notice officielle et aux recommandations de la Haute Autorité de santé.",4],
+  ["Il suffit d'une phrase, ajoutée à votre question.",5],
+  ["À vous : choisissez deux sources, et comparez les réponses.",6]],
+ n3:[["Dans chaque demande, une phrase pour limiter les sources. C'est le meilleur moyen de cadrer la réponse."]],
+ c4:[["Dernier réflexe : revenir à la source.",1],["Voici l'extrait de la notice officielle.",2],["Et voici ce que l'IA a répondu pendant votre garde.",3],["Les réponses fausses étaient écrites avec le même aplomb que les vraies.",4],["Même bien cadrée, l'IA peut se tromper. C'est à vous de vérifier.",5]],
+ n4:[["L'IA propose, le professionnel dispose."]]};
+const G={speed:1,state:"menu",run:0,role:ROLES[0],s:55,src:0,chap:1,chapHist:[],hist:[],tested:[],fo:null,lastSrc:0,typing:null,fresh:false,skip:false};
+
+/* ---------- Logique pure ---------- */
+const tempT=s=>0.25*Math.pow(8,s/100), tempName=s=>s<34?"Froid":s<67?"Tiède":"Chaud";
+/* Répartit les 20 faces entre les réponses selon leur poids et la température */
+function faces(w0,T){const w=w0.map(x=>Math.pow(x,1/T)),t=w.reduce((a,b)=>a+b,0),raw=w.map(x=>x/t*20),fl=raw.map(Math.floor);
+  const r=20-fl.reduce((a,b)=>a+b,0),o=raw.map((x,i)=>[x-fl[i],i]).sort((a,b)=>b[0]-a[0]);for(let k=0;k<r;k++)fl[o[k][1]]++;return fl}
+function pickFace(n,f){let a=0;for(let i=0;i<f.length;i++){a+=f[i];if(n<=a)return i}return f.length-1}
+const lerp=(a,b,u)=>a+(b-a)*u, eio=u=>u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2, eo=u=>1-Math.pow(1-u,3), sm=u=>u*u*u*(u*(u*6-15)+10);
+let seed=11;const rnd=()=>{seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const RM=matchMedia("(prefers-reduced-motion: reduce)").matches;
+
