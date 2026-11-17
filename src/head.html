@@ -275,7 +275,7 @@ h1,h2,h3{font-family:var(--titre);text-wrap:balance}
 .paper p{margin:.45em 0;position:relative}
 .paper p::before{content:"";position:absolute;left:calc(var(--ml) - var(--pl) - 6px);top:.42em;width:14px;height:14px;border-radius:50%;background:var(--orange)}
 .endbox .dcard h3{font-size:clamp(16px,1.95vw,34px);color:#6fdcff;margin:.1em 0 .4em}
-.copy{background:linear-gradient(180deg,#fdf6e6,#f1e6cd);color:#0b2440;border-left:.5em solid var(--orange);border-radius:.7em;padding:.5em .8em;font-weight:700;font-size:clamp(14px,1.55vw,27px);line-height:1.3;margin-bottom:.7em;box-shadow:0 6px 14px rgba(0,0,0,.3)}
+.copy{background:linear-gradient(180deg,#f6fcff,#dcf0fb);color:#01233F;border:2px solid #7cc8ec;border-radius:.7em;padding:.5em .8em;font-weight:700;font-size:clamp(14px,1.55vw,27px);line-height:1.3;margin-bottom:.7em;box-shadow:0 6px 14px rgba(0,0,0,.3)}
 .stat{font-weight:700;font-size:clamp(13px,1.45vw,25px);margin-bottom:.6em}
 .sig{font-family:var(--titre);font-weight:700;color:#6fdcff;font-size:clamp(17px,2.1vw,36px);margin-bottom:.4em}
 .row{display:flex;flex-wrap:wrap;gap:18px}
@@ -290,6 +290,8 @@ h1,h2,h3{font-family:var(--titre);text-wrap:balance}
 .ask .deco{position:absolute;left:-10%;top:6%;width:12%;transform:rotate(-8deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
 .notice .deco2{position:absolute;left:-9%;bottom:-24%;width:25%;transform:rotate(-10deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.45))}
 .paper .deco{position:absolute;right:-5%;bottom:-11%;width:27%;transform:rotate(6deg);filter:drop-shadow(0 12px 16px rgba(0,0,0,.5))}
+/* la dernière note laisse la place du carnet illustré, posé dans l'angle bas droit de la feuille */
+.paper p:last-of-type{padding-right:24%}
 .row .peek{margin-left:auto;height:clamp(90px,17vh,190px);width:auto;margin-top:-4vh;filter:drop-shadow(0 0 18px rgba(63,208,255,.5)) drop-shadow(0 10px 12px rgba(0,0,0,.45))}
 .orig .oic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;box-shadow:inset 0 2px 0 rgba(255,255,255,.45),0 2px 5px rgba(1,35,63,.25)}
 .oic .gi{width:86%;height:86%;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(0,0,0,.3))}
@@ -496,7 +498,7 @@ const TRUTHS={1:["L'IA a appris sur une immense partie d'Internet. Tout n'y est 
 /* Question quiz posée après un chapitre (clé = numéro du chapitre qui vient de se terminer) : titre, réponses, indice de la bonne réponse, explication, clé de voix off */
 const QUIZ={2:{h:"À votre avis, combien de mots l'IA <em>passe-t-elle en revue</em> avant d'écrire le suivant ?",o:["Les 5 mots les plus évidents","Une centaine de mots","Des dizaines de milliers, à chaque mot"],a:2,x:"À chaque mot, l'IA donne une probabilité à tout son vocabulaire : des dizaines de milliers de fragments de mots. Puis elle en tire un.",vo:"q1"}};
 /* Notes écrites à la main dans le carnet, une par chapitre */
-const NOTE_TXT=["L'IA a tout lu : le vrai comme le faux.","L'IA est probabiliste. Elle prédit, elle ne sait pas.","Dans chaque demande : une phrase pour limiter les sources.","L'IA propose, le professionnel dispose."];
+const NOTE_TXT=["L'IA a tout lu : le vrai comme le faux.","L'IA est probabiliste. Elle prédit, elle ne sait pas.","Dans chaque demande : une phrase pour limiter les sources.","L'IA propose, mais je reste seul responsable de la décision."];
 /* Voix off : [texte du sous-titre, étape de l'infographie à révéler, plan de coupe 3D facultatif]. Fichiers attendus : audio/vo_<clé>.mp3 (ou .wav). Sans fichier, seuls les sous-titres défilent. */
 const VO={
  intro:[["Sept heures quarante-deux. Votre bureau."],["Une question simple, et un assistant IA prêt à répondre."],["Avant de lui faire confiance, regardons comment il s'y prend."]],
@@ -538,7 +540,7 @@ const VO={
   ["À vous : choisissez deux sources, et comparez les réponses.",6]],
  n3:[["Dans chaque demande, une phrase pour limiter les sources. C'est le meilleur moyen de cadrer la réponse."]],
  c4:[["Dernier réflexe : revenir à la source.",1],["Voici l'extrait de la notice officielle.",2],["Et voici ce que l'IA a répondu pendant votre garde.",3],["Les réponses fausses étaient écrites avec le même aplomb que les vraies.",4],["Même bien cadrée, l'IA peut se tromper. C'est à vous de vérifier.",5]],
- n4:[["L'IA propose, le professionnel dispose."]]};
+ n4:[["L'IA propose, mais je reste seul responsable de la décision."]]};
 const G={speed:1,state:"menu",run:0,role:ROLES[0],s:55,src:0,chap:1,chapHist:[],hist:[],tested:[],fo:null,lastSrc:0,typing:null,fresh:false,skip:false};
 
 /* ---------- Logique pure ---------- */
