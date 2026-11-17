@@ -110,7 +110,7 @@ Dernier réflexe : revenir à la source.
 ## 13. `audio/vo_n4.mp3` - Note 4, conclusion dans le carnet
 Voix : Puck
 ```
-L'IA propose. [pause courte] Le professionnel dispose.
+L'IA propose, mais je reste seul responsable de la décision.
 ```
 
 ## 14. `audio/vo_accueil.mp3` - Page d'accueil
